@@ -14,7 +14,6 @@ pipeline {
         ARTIFACTORY_CREDENTIALS = credentials('artifactory-credentials')
         CORDA_ARTIFACTORY_PASSWORD = "${env.ARTIFACTORY_CREDENTIALS_PSW}"
         CORDA_ARTIFACTORY_USERNAME = "${env.ARTIFACTORY_CREDENTIALS_USR}"
-        HELM_CHART_REPO = "helm/charts"
         HELM_REGISTRY = setHelmRegistry()
         HELM_CHARTS_DIR = "helm-charts" // used in the helmPublisher method to set the directory the OCI should be located in.
     }
@@ -26,42 +25,14 @@ pipeline {
         timeout(activity: true, time: 10)
     }
     stages {
-        stage('Check Helm Changes') {
-            steps {
-                script {
-                    def charts = sh(returnStdout: true, script: "ls -d ${env.HELM_CHART_REPO}/*/").trim().split("\n")
-                    def newCharts = ""
-                        charts.eachWithIndex { chart, i ->
-                            if (i == 0) {
-                                newCharts = "'$chart':true"
-                            }
-                            else {
-                                newCharts = "$newCharts, '$chart':true"
-                            }
-                        }
-                    echo "Charts configMap created: [${newCharts}]"
-                    env.charts_repos = "[$newCharts]"
-                }
-            }
-        }
-        stage('Build Helm chart dependencies') {
-            steps {
-                script {
-                    def helmCharts = evaluate(env.charts_repos)
-                    helmCharts.each { helm, status ->
-                        sh "helm dependency build $helm"
-                    }
-                }
-            }
-        }
         stage('Publish Helm Chart') {
             steps {
                 script {
-                    def helmCharts = evaluate(env.charts_repos)
-                    helmCharts.each { helm, status ->
+                    helmCharts = ['helm/charts/besu-node', 'helm/charts/besu-genesis']
+                    helmCharts.each { helm ->
                         def helmVersion = sh(returnStdout: true, script: "yq '.version' $helm/Chart.yaml").trim()
                         helmPublisher(helm, helmVersion)
-                        renderWidget("Published Corda helm chart $helm with version: $helmVersion")
+                        renderWidget("Published ethereum helm chart $helm with version: $helmVersion")
                     }
                 }
             }
